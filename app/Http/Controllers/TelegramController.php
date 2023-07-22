@@ -3,94 +3,127 @@
 namespace App\Http\Controllers;
 
 use App\Models\Post;
+use App\Models\User;
 use Illuminate\Http\Request;
 use App\Services\TelegramService;
+use App\Traits\HttpResponse;
 use Illuminate\Support\Facades\DB;
 
 class TelegramController extends Controller
 {
+    use HttpResponse;
+
     public function handle(Request $request)
     {
-        $input = $request->all();
+        try {
+            $input = $request->all();
 
-        $bot = new TelegramService;
-        $bot->setData($input);
+            $bot = new TelegramService;
+            $bot->setData($input);
 
-        // step 
-        $step = $request->session()->get($bot->ChatID() . '_step') ?? 0;
-        $name = $request->session()->get($bot->ChatID() . '_name') ?? NULL;
-        $url = $request->session()->get($bot->ChatID() . '_url') ?? NULL;
-        $git = $request->session()->get($bot->ChatID() . '_git') ?? NULL;
+            //user data
+            $user = User::where('chat_id', $bot->ChatID())->first();
+            $step = $user->step ?? 0;
+            $text = $bot->Text();
 
+            if ($text == '/start') {
 
-        if ($bot->Text() == '/start') {
-            $bot->sendMessage([
-                'chat_id' => $bot->ChatID(),
-                'text' => 'salom ' .  $bot->FirstName()
-            ]);
-            $request->session()->put('user_id_' . $bot->ChatID() . '_step', 0);
-        }
+                // if user not exist create new user
+                if (!$user) {
+                    $user = new User();
+                    $user->chat_id = $bot->ChatID();
+                    $user->step = 0;
+                    $user->save();
+                }
 
-        if ($bot->Text() == '/add' and $bot->checkAdmin()) {
-            $bot->sendMessage([
-                'chat_id' => $bot->ChatID(),
-                'text' => 'Loyiha uchun nomni kiriting:'
-            ]);
-            $request->session()->put('user_id_' . $bot->ChatID() . '_step', 1);
-        } elseif ($bot->Text() == '/add')
-            $bot->sendMessage([
-                'chat_id' => $bot->ChatID(),
-                'text' => 'Ushbu buyruq siz uchun emas.'
-            ]);
+                $bot->sendMessage([
+                    'chat_id' => $bot->ChatID(),
+                    'text' => 'salom ' .  $bot->FirstName()
+                ]);
 
-        if ($step == 1) {
-            $bot->sendMessage([
-                'chat_id' => $bot->ChatID(),
-                'text' => 'Loyiha uchun urlni yuboring.'
-            ]);
-            $request->session()->put('user_id_' . $bot->ChatID() . '_name', $bot->Text());
-            $request->session()->put('user_id_' . $bot->ChatID() . '_step', 2);
-        }
+                // update step to 0
+                $user->step = 0;
+                $user->save();
+            }
 
-        if ($step == 2) {
-            $bot->sendMessage([
-                'chat_id' => $bot->ChatID(),
-                'text' => 'Github uchun urlni yuboring.'
-            ]);
-            $request->session()->put('user_id_' . $bot->ChatID() . '_url', $bot->Text());
-            $request->session()->put('user_id_' . $bot->ChatID() . '_step', 3);
-        }
+            if ($text == '/add' and $bot->checkAdmin()) {
+                $bot->sendMessage([
+                    'chat_id' => $bot->ChatID(),
+                    'text' => 'Loyiha uchun nomni kiriting:'
+                ]);
 
-        if ($step == 3) {
-            $bot->sendMessage([
-                'chat_id' => $bot->ChatID(),
-                'text' => 'Logotipni yuboring.'
-            ]);
-            $request->session()->put('user_id_' . $bot->ChatID() . '_git', $bot->Text());
-            $request->session()->put('user_id_' . $bot->ChatID() . '_step', 4);
-        }
+                // update step to 1
+                $user->step = 1;
+                $user->save();
+            } elseif ($text == '/add')
+                $bot->sendMessage([
+                    'chat_id' => $bot->ChatID(),
+                    'text' => 'Ushbu buyruq siz uchun emas.'
+                ]);
 
-        if ($step == 4) {
-            $bot->sendMessage([
-                'chat_id' => $bot->ChatID(),
-                'text' => 'Hammasi saqlandi!.'
-            ]);
+            if ($step == 1) {
+                $bot->sendMessage([
+                    'chat_id' => $bot->ChatID(),
+                    'text' => 'Loyiha uchun urlni yuboring.'
+                ]);
 
-            $photo_name = $bot->UniqueStr();
-            $bot->downloadFile($bot->PhotoId(), 'public/images/' . $photo_name);
+                // update step to 2 and save name
+                $user->step = 2;
+                $user->name = $text;
+                $user->save();
+            }
 
-            DB::beginTransaction();
-            $post = new Post();
-            $post->name = $name;
-            $post->img = env('APP_URL') . '/public/images/' . $photo_name;
-            $post->url = $url;
-            $post->github_url = $git;
-            DB::commit();
+            if ($step == 2) {
+                $bot->sendMessage([
+                    'chat_id' => $bot->ChatID(),
+                    'text' => 'Github uchun urlni yuboring.'
+                ]);
 
-            $request->session()->put('user_id_' . $bot->ChatID() . '_step', 0);
-            $request->session()->forget($bot->ChatID() . '_name');
-            $request->session()->forget($bot->ChatID() . '_url');
-            $request->session()->forget($bot->ChatID() . '_git');
+                // update step to 3 and save url
+                $user->step = 3;
+                $user->url = $text;
+                $user->save();
+            }
+
+            if ($step == 3) {
+                $bot->sendMessage([
+                    'chat_id' => $bot->ChatID(),
+                    'text' => 'Logotipni yuboring.'
+                ]);
+
+                // update step to 4 and save github url
+                $user->step = 4;
+                $user->github_url = $text;
+                $user->save();
+            }
+
+            if ($step == 4) {
+                $bot->sendMessage([
+                    'chat_id' => $bot->ChatID(),
+                    'text' => 'Hammasi saqlandi!'
+                ]);
+                
+                $photo_name = $bot->UniqueStr();
+
+                DB::beginTransaction();
+
+                $post = new Post();
+                $post->name = $user->name;
+                $post->img = env('APP_URL') . 'images/' . $photo_name;
+                $post->url = $user->url;
+                $post->github_url = $user->git;
+                $post->save();
+
+                DB::commit();
+
+                $bot->downloadFile($bot->PhotoId(), 'images/' . $photo_name);
+
+                // update step to 0
+                $user->step = 0;
+                $user->save();
+            }
+        } catch (\Exception $e) {
+            return $this->log($e);
         }
     }
 }

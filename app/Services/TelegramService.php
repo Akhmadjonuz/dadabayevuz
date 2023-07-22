@@ -37,6 +37,13 @@ class TelegramService
         $this->data = $this->getData();
     }
 
+    /**
+     * Summary of endpoint
+     * @param string $api
+     * @param array $content
+     * @param mixed $post
+     * @return array
+     */
     private function endpoint(string $api, array $content, $post = true): array
     {
         $url = 'https://api.telegram.org/bot' . $this->bot_token . '/' . $api;
@@ -59,7 +66,7 @@ class TelegramService
 
     public function UniqueStr(): string
     {
-        return time() . '_' . Str::random(10);
+        return time() . Str::random(10) . '.jpg';
     }
 
     public function getMe()
@@ -244,8 +251,8 @@ class TelegramService
     {
 
         $file_url = 'https://api.telegram.org/file/bot' . $this->bot_token . '/' . $this->getFile($file_id);
-        $photo_response = Http::get($file_url);
-        $photo_data = $photo_response->body();
+        $response = Http::get($file_url);
+        $photo_data = $response->body();
         Storage::put($local_path, $photo_data);
     }
 
@@ -281,18 +288,20 @@ class TelegramService
             return @$this->data['channel_post']['text'];
         elseif ($type == self::EDITED_MESSAGE)
             return @$this->data['edited_message']['text'];
-        else
+        elseif ($type == self::MESSAGE)
             return @$this->data['message']['text'];
+        else
+            return '';
     }
 
     public function PhotoId(): string
     {
         $type = $this->getUpdateType();
-        $count = count($this->data['photo']) - 1;
+        $count = count($this->data['message']['photo']) - 1;
         if ($type == self::PHOTO)
-            return @$this->data['photo'][$count]['file_id'];
+            return @$this->data['message']['photo'][$count]['file_id'];
         else
-            return $this->log('no photo');
+            return 'no photo';
     }
 
     public function Caption(): string
@@ -473,10 +482,10 @@ class TelegramService
     public function buildKeyBoard(array $options, $onetime = false, $resize = false, $selective = true)
     {
         $replyMarkup = [
-            'keyboard'          => $options,
+            'keyboard' => $options,
             'one_time_keyboard' => $onetime,
-            'resize_keyboard'   => $resize,
-            'selective'         => $selective,
+            'resize_keyboard' => $resize,
+            'selective' => $selective,
         ];
         $encodedMarkup = json_encode($replyMarkup, true);
         return $encodedMarkup;
@@ -522,8 +531,8 @@ class TelegramService
     public function buildKeyboardButton($text, $request_contact = false, $request_location = false)
     {
         $replyMarkup = [
-            'text'             => $text,
-            'request_contact'  => $request_contact,
+            'text' => $text,
+            'request_contact' => $request_contact,
             'request_location' => $request_location,
         ];
 
@@ -534,7 +543,7 @@ class TelegramService
     {
         $replyMarkup = [
             'remove_keyboard' => true,
-            'selective'       => $selective,
+            'selective' => $selective,
         ];
         $encodedMarkup = json_encode($replyMarkup, true);
 
@@ -545,7 +554,7 @@ class TelegramService
     {
         $replyMarkup = [
             'force_reply' => true,
-            'selective'   => $selective,
+            'selective' => $selective,
         ];
         $encodedMarkup = json_encode($replyMarkup, true);
 
@@ -713,7 +722,6 @@ class TelegramService
                 return $result->json();
             else
                 return [];
-            $this->log($result->status());
         } catch (\Exception $e) {
             return $this->log($e);
         }

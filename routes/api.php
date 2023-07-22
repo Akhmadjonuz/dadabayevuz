@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\ImageController;
+use App\Http\Controllers\TelegramController;
 use App\Models\Post;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -15,9 +17,15 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+Route::get('/test', function () {
+    return 1;
+});
+
 
 Route::post('telegram/webhook', [TelegramController::class, 'handle']);
 
-Route::get('/all_portfolio', function () {
+Route::get('/images/{filename}', [ImageController::class, 'show'])->name('image.show');
+
+Route::get('/all', function () {
     return Post::all();
 });
