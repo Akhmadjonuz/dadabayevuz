@@ -109,7 +109,7 @@ class TelegramController extends Controller
 
                 $post = new Post();
                 $post->name = $user->name;
-                $post->img = env('APP_URL') . 'images/' . $photo_name;
+                $post->img = env('APP_URL') . '/api/images/' . $photo_name;
                 $post->url = $user->url;
                 $post->github_url = $user->git;
                 $post->save();
